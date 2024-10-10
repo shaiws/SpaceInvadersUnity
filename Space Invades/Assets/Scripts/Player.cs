@@ -6,7 +6,10 @@ public class Player : MonoBehaviour
 {
     public float speed = 5f;
     public Projectile laserPrefab;
-    private Projectile laser;
+    [SerializeField] private Transform leftBoundary; 
+    [SerializeField] private Transform rightBoundary;
+
+    public  Projectile laser { get; set; } 
     private Rigidbody2D rb;
 
     private void Awake()
@@ -25,14 +28,11 @@ public class Player : MonoBehaviour
             position.x += speed * Time.deltaTime;
         }
 
-        Vector3 leftEdge = Camera.main.ViewportToWorldPoint(Vector3.zero);
-        Vector3 rightEdge = Camera.main.ViewportToWorldPoint(Vector3.right);
-        position.x = Mathf.Clamp(position.x, leftEdge.x, rightEdge.x);
+        position.x = Mathf.Clamp(position.x, leftBoundary.position.x, rightBoundary.position.x);
 
         transform.position = position;
 
-
-        if (laser == null && (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))) {
+        if (laser == null && Input.GetKeyDown(KeyCode.Space) ) {
             laser = Instantiate(laserPrefab, transform.position, Quaternion.identity);
         }
     }

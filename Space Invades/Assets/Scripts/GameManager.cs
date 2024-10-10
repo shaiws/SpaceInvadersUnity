@@ -1,27 +1,34 @@
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 [DefaultExecutionOrder(-1)]
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    // [SerializeField] private Text scoreLabel;
-    // [SerializeField] private Text livesLabel;
+    public event System.Action<int> OnScoreChanged;
+    public event System.Action<int> OnLivesChanged;
+    public event System.Action<int> OnLevelChanged;
+    public event System.Action OnGameOver;
+
 
     private Player mainPlayer;
     private Invaders enemyGroup;
-    private ExtraShip bonusShip;
-    private Boulder[] rocks;
+    private Boulder[] boulders;
 
-    public int points { get; private set; } = 0;
-    public int health { get; private set; } = 3;
+    public int Points { get; private set; } = 0;
+    public int Health { get; private set; } = 3;
+
+    public int CurrentLevel { get; private set; } = 1;
 
     private void Awake()
     {
-        if (Instance != null && Instance != this) {
+        if (Instance != null && Instance != this)
+        {
             DestroyImmediate(gameObject);
-        } else {
+        }
+        else
+        {
             Instance = this;
             DontDestroyOnLoad(gameObject);
         }
@@ -29,42 +36,79 @@ public class GameManager : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (Instance == this) {
+        if (Instance == this)
+        {
             Instance = null;
         }
     }
 
     private void Start()
     {
+        InitializeGameObjects();
+        StartGame();
+    }
+
+    private void InitializeGameObjects()
+    {
         mainPlayer = FindObjectOfType<Player>();
         enemyGroup = FindObjectOfType<Invaders>();
-        bonusShip = FindObjectOfType<ExtraShip>();
-        rocks = FindObjectsOfType<Boulder>();
+        boulders = FindObjectsOfType<Boulder>();
+    }
 
-        StartGame();
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        InitializeGameObjects();
+        StartRound();
     }
 
     private void Update()
     {
-        if (health <= 0 && Input.GetKeyDown(KeyCode.Return)) {
-            StartGame();
+        if (Health <= 0 && Input.GetKeyDown(KeyCode.Return))
+        {
+            RestartGame();
         }
     }
 
-    private void StartGame()
+   
+    public void StartGame()
     {
-        UpdateScore(0);
-        UpdateLives(3);
-        StartRound();
+        CurrentLevel = 1; 
+        Points = 0;
+        Health = 3;
+        OnScoreChanged?.Invoke(Points);
+        OnLivesChanged?.Invoke(Health);
+        SceneManager.LoadScene(GetSceneIndexForLevel(CurrentLevel));
     }
 
-    private void StartRound()
+  
+    private void RestartGame()
+    {
+        StartGame();
+    }
+
+       private int GetSceneIndexForLevel(int level)
+    {
+        return level;
+    }
+
+    public void StartRound()
     {
         enemyGroup.ResetInvaders();
         enemyGroup.gameObject.SetActive(true);
 
-        for (int i = 0; i < rocks.Length; i++) {
-            rocks[i].ResetBoulder();
+        foreach (var boulder in boulders)
+        {
+            boulder.ResetBoulder();
         }
 
         RespawnPlayer();
@@ -75,48 +119,58 @@ public class GameManager : MonoBehaviour
         Vector3 playerPos = mainPlayer.transform.position;
         playerPos.x = 0f;
         mainPlayer.transform.position = playerPos;
+        mainPlayer.laser = null;
         mainPlayer.gameObject.SetActive(true);
     }
 
-    private void UpdateScore(int newScore)
+    private void EndGame()
     {
-        points = newScore;
-        // scoreLabel.text = points.ToString().PadLeft(4, '0');
-    }
-
-    private void UpdateLives(int newLives)
-    {
-        health = Mathf.Max(newLives, 0);
-        // livesLabel.text = health.ToString();
+        OnGameOver?.Invoke();
+        enemyGroup.gameObject.SetActive(false);
     }
 
     public void OnPlayerDeath(Player player)
     {
-        UpdateLives(health - 1);
+        Health = Mathf.Max(Health - 1, 0);
+        OnLivesChanged?.Invoke(Health);
 
         player.gameObject.SetActive(false);
 
-        if (health > 0) {
+        if (Health > 0)
+        {
             Invoke(nameof(StartRound), 1f);
-        } else {
-            // EndGame();
+        }
+        else
+        {
+            EndGame();
         }
     }
 
     public void OnEnemyKilled(Invader invader)
     {
         invader.gameObject.SetActive(false);
+        Points += invader.alienScore;
+        OnScoreChanged?.Invoke(Points);
 
-        UpdateScore(points + invader.alienScore);
-
-        if (enemyGroup.GetAliveCount() == 0) {
-            StartRound();
+        if (enemyGroup.GetAliveCount() == 0)
+        {
+            OnLevelChanged?.Invoke(CurrentLevel);
+            LoadNextLevel();
         }
     }
 
-    public void OnBonusShipKilled(ExtraShip extraShip)
+    private void LoadNextLevel()
     {
-        UpdateScore(points + extraShip.shipScore);
+        CurrentLevel++;
+        int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
+        if (currentSceneIndex == 2) {
+            SceneManager.LoadScene(1); 
+            CurrentLevel = 1; 
+        }
+        else
+        {
+            SceneManager.LoadScene(currentSceneIndex + 1);
+        }
     }
 
     public void OnEdgeReached()

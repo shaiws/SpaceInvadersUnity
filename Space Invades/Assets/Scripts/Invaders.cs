@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class Invaders : MonoBehaviour
 {
@@ -8,45 +9,72 @@ public class Invaders : MonoBehaviour
     private Vector3 direction = Vector3.right;
     private Vector3 initialPosition;
 
-    [Header("Grid")]
-    public int rows = 5;
-    public int columns = 11;
+    [SerializeField] private Transform leftBoundary;
+    [SerializeField] private Transform rightBoundary;
 
+    [Header("Grid")]
+    public int baseRows = 5;
+    public int baseColumns = 6;
+    public int rows;
+    public int columns;
     [Header("Missiles")]
     public Projectile missilePrefab;
-    public float missileSpawnRate = 1f;
+    public float baseMissileSpawnRate = 1f;
+    public float missileSpawnRate;
+
+    [Header("Speed")]
+    public float speedMultiplier = 1f;
 
     private void Awake()
     {
         initialPosition = transform.position;
 
+        SetLevelParameters();
+
         CreateInvaderGrid();
     }
 
-    private void CreateInvaderGrid()
-{
-    float invaderSpacing = 3f; 
-    float verticalOffset = 2f; 
-
-    for (int i = 0; i < rows; i++)
+    private void SetLevelParameters()
     {
-        float width = invaderSpacing * (columns - 1);
-        float height = invaderSpacing * (rows - 1);
+        int level = GameManager.Instance.CurrentLevel;
 
-        Vector2 centerOffset = new Vector2(-width / 2f, -height / 2f + verticalOffset);
-        Vector3 rowPosition = new Vector3(centerOffset.x, (invaderSpacing * i) + centerOffset.y, 0f);
 
-        for (int j = 0; j < columns; j++)
+        rows = Mathf.Clamp(baseRows + (level - 1), 5, 10);
+
+
+        columns = Mathf.Clamp(baseColumns + (level - 1), 6, 12);
+
+        speedMultiplier = 1f + (level - 1) * 2f;
+
+
+        missileSpawnRate = baseMissileSpawnRate + (level - 1);
+
+    }
+
+    private void CreateInvaderGrid()
+    {
+        float invaderSpacing = 3f;
+        float verticalOffset = 2f;
+
+        for (int i = 0; i < rows; i++)
         {
-            Invader invader = Instantiate(prefabs[i], transform);
+            int prefabIndex = i % prefabs.Length;
+            float width = invaderSpacing * (columns - 1);
+            float height = invaderSpacing * (rows - 1);
 
-            Vector3 position = rowPosition;
-            position.x += invaderSpacing * j;
-            invader.transform.localPosition = position;
+            Vector2 centerOffset = new Vector2(-width / 2f, -height / 3f + verticalOffset);
+            Vector3 rowPosition = new Vector3(centerOffset.x, (invaderSpacing * i) + centerOffset.y, 0f);
+
+            for (int j = 0; j < columns; j++)
+            {
+                Invader invader = Instantiate(prefabs[prefabIndex], transform);
+
+                Vector3 position = rowPosition;
+                position.x += invaderSpacing * j;
+                invader.transform.localPosition = position;
+            }
         }
     }
-}
-
 
     private void Start()
     {
@@ -57,17 +85,18 @@ public class Invaders : MonoBehaviour
     {
         int amountAlive = GetAliveCount();
 
-        if (amountAlive == 0) {
+        if (amountAlive == 0)
+        {
             return;
         }
 
         foreach (Transform invader in transform)
         {
-            if (!invader.gameObject.activeInHierarchy) {
+            if (!invader.gameObject.activeInHierarchy)
+            {
                 continue;
             }
 
-       
             if (Random.value < (1f / amountAlive))
             {
                 Instantiate(missilePrefab, invader.position, Quaternion.identity);
@@ -83,17 +112,16 @@ public class Invaders : MonoBehaviour
         int amountKilled = totalCount - amountAlive;
         float percentKilled = amountKilled / (float)totalCount;
 
-        float speed = this.speed.Evaluate(percentKilled);
-        transform.position += speed * Time.deltaTime * direction;
+        float currentSpeed = speed.Evaluate(percentKilled * 5f) * speedMultiplier;
+        transform.position += currentSpeed * Time.deltaTime * direction;
 
-
-        Vector3 leftEdge = Camera.main.ViewportToWorldPoint(Vector3.zero);
-        Vector3 rightEdge = Camera.main.ViewportToWorldPoint(Vector3.right);
-
+        Vector3 leftEdge = leftBoundary.position;
+        Vector3 rightEdge = rightBoundary.position;
 
         foreach (Transform invader in transform)
         {
-            if (!invader.gameObject.activeInHierarchy) {
+            if (!invader.gameObject.activeInHierarchy)
+            {
                 continue;
             }
 
@@ -124,7 +152,8 @@ public class Invaders : MonoBehaviour
         direction = Vector3.right;
         transform.position = initialPosition;
 
-        foreach (Transform invader in transform) {
+        foreach (Transform invader in transform)
+        {
             invader.gameObject.SetActive(true);
         }
     }
@@ -135,12 +164,12 @@ public class Invaders : MonoBehaviour
 
         foreach (Transform invader in transform)
         {
-            if (invader.gameObject.activeSelf) {
+            if (invader.gameObject.activeSelf)
+            {
                 count++;
             }
         }
 
         return count;
     }
-
 }
